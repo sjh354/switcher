@@ -1,0 +1,49 @@
+package com.rey.material.widget;
+
+import android.content.Context;
+import android.util.AttributeSet;
+import com.rey.material.drawable.RadioButtonDrawable;
+
+/* JADX INFO: loaded from: classes2.dex */
+public class RadioButton extends CompoundButton {
+    public RadioButton(Context context) {
+        super(context);
+    }
+
+    public RadioButton(Context context, AttributeSet attributeSet) {
+        super(context, attributeSet);
+    }
+
+    public RadioButton(Context context, AttributeSet attributeSet, int i) {
+        super(context, attributeSet, i);
+    }
+
+    @Override // com.rey.material.widget.CompoundButton
+    protected void applyStyle(Context context, AttributeSet attributeSet, int i, int i2) {
+        super.applyStyle(context, attributeSet, i, i2);
+        RadioButtonDrawable radioButtonDrawableBuild = new RadioButtonDrawable.Builder(context, attributeSet, i, i2).build();
+        radioButtonDrawableBuild.setInEditMode(isInEditMode());
+        radioButtonDrawableBuild.setAnimEnable(false);
+        setButtonDrawable(radioButtonDrawableBuild);
+        radioButtonDrawableBuild.setAnimEnable(true);
+    }
+
+    @Override // android.widget.CompoundButton, android.widget.Checkable
+    public void toggle() {
+        if (isChecked()) {
+            return;
+        }
+        super.toggle();
+    }
+
+    public void setCheckedImmediately(boolean z) {
+        if (getButtonDrawable() instanceof RadioButtonDrawable) {
+            RadioButtonDrawable radioButtonDrawable = (RadioButtonDrawable) getButtonDrawable();
+            radioButtonDrawable.setAnimEnable(false);
+            setChecked(z);
+            radioButtonDrawable.setAnimEnable(true);
+            return;
+        }
+        setChecked(z);
+    }
+}

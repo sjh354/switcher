@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="219dp"
+    android:minHeight="48dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_aircon"
+    android:configure="kr.switcher.switcherm.ui.widget.AirconWidgetSelectActivity"
+    android:previewImage="@drawable/preview_aircon"
+    android:resizeMode="vertical|horizontal"/>

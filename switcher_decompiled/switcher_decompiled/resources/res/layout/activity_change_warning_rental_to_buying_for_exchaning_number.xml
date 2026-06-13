@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:id="@+id/rl_root"
+    android:background="@color/very_light_blue"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <RelativeLayout
+        android:gravity="center_vertical"
+        android:background="@color/white"
+        android:paddingLeft="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="56">
+        <ImageView
+            android:id="@+id/btn_close"
+            android:background="@drawable/btn_close_dark_default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"/>
+        <TextView
+            android:textSize="18sp"
+            android:textColor="@color/charcoal_grey"
+            android:gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="교환 횟수"
+            android:layout_centerInParent="true"/>
+    </RelativeLayout>
+    <LinearLayout
+        android:orientation="vertical"
+        android:paddingLeft="25dp"
+        android:paddingTop="28dp"
+        android:paddingRight="25dp"
+        android:paddingBottom="28dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="512">
+        <TextView
+            android:textSize="14sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="1. 총 교환한 횟수입니다"/>
+        <TextView
+            android:textSize="14sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp"
+            android:text="2. 교환에는 제품 하자로 인한 무료 교환, 렌탈 서비스 무료 교환이 있습니다"/>
+        <TextView
+            android:textSize="14sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp"
+            android:text="3. 렌탈 서비스 교환을 받으셨다면, 할인 금액의 기간은 교환일 이후로 계산됩니다"/>
+    </LinearLayout>
+</LinearLayout>

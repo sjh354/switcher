@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Xcode
+Switcher/Switcher.xcodeproj/xcuserdata/
+Switcher/Switcher.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+
+# Python
+__pycache__/
+*.pyc

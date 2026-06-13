@@ -1,0 +1,34 @@
+package com.google.android.gms.internal.gtm;
+
+import java.util.Map;
+
+/* JADX INFO: compiled from: com.google.android.gms:play-services-analytics-impl@@18.0.2 */
+/* JADX INFO: loaded from: classes.dex */
+final class zzbfv implements Map.Entry {
+    private final Map.Entry zza;
+
+    @Override // java.util.Map.Entry
+    public final Object getKey() {
+        return this.zza.getKey();
+    }
+
+    @Override // java.util.Map.Entry
+    public final Object getValue() {
+        if (((zzbfx) this.zza.getValue()) == null) {
+            return null;
+        }
+        throw null;
+    }
+
+    @Override // java.util.Map.Entry
+    public final Object setValue(Object obj) {
+        if (obj instanceof zzbgs) {
+            return ((zzbfx) this.zza.getValue()).zzc((zzbgs) obj);
+        }
+        throw new IllegalArgumentException("LazyField now only used for MessageSet, and the value of MessageSet must be an instance of MessageLite");
+    }
+
+    public final zzbfx zza() {
+        return (zzbfx) this.zza.getValue();
+    }
+}

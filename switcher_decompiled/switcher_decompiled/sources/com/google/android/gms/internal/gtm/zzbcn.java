@@ -1,0 +1,49 @@
+package com.google.android.gms.internal.gtm;
+
+/* JADX INFO: compiled from: com.google.android.gms:play-services-analytics-impl@@18.0.2 */
+/* JADX INFO: loaded from: classes.dex */
+public final class zzbcn extends zzbfb implements zzbgt {
+    private static final zzbcn zza;
+    private int zzf;
+    private boolean zzh;
+    private boolean zzi;
+    private byte zzk = 2;
+    private String zzg = "";
+    private zzbfp zzj = zzbhc.zze();
+
+    static {
+        zzbcn zzbcnVar = new zzbcn();
+        zza = zzbcnVar;
+        zzbff.zzan(zzbcn.class, zzbcnVar);
+    }
+
+    private zzbcn() {
+    }
+
+    public static zzbcn zze() {
+        return zza;
+    }
+
+    @Override // com.google.android.gms.internal.gtm.zzbff
+    protected final Object zzb(int i, Object obj, Object obj2) {
+        int i2 = i - 1;
+        if (i2 == 0) {
+            return Byte.valueOf(this.zzk);
+        }
+        if (i2 == 2) {
+            return new zzbhd(zza, "\u0001\u0004\u0000\u0001\u0001ϧ\u0004\u0000\u0001\u0001\u0001ဈ\u0000\u0002ဇ\u0001\u0003ဇ\u0002ϧЛ", new Object[]{"zzf", "zzg", "zzh", "zzi", "zzj", zzbei.class});
+        }
+        if (i2 == 3) {
+            return new zzbcn();
+        }
+        zzbcl zzbclVar = null;
+        if (i2 == 4) {
+            return new zzbcm(zzbclVar);
+        }
+        if (i2 == 5) {
+            return zza;
+        }
+        this.zzk = obj == null ? (byte) 0 : (byte) 1;
+        return null;
+    }
+}

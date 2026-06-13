@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:id="@+id/rl_root"
+    android:background="@color/very_light_blue"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <RelativeLayout
+        android:gravity="center_vertical"
+        android:background="@color/white"
+        android:paddingLeft="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="56">
+        <ImageView
+            android:id="@+id/btn_close"
+            android:background="@drawable/btn_close_dark_default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"/>
+        <TextView
+            android:textSize="18sp"
+            android:textColor="@color/charcoal_grey"
+            android:gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="변경 시 유의사항"
+            android:layout_centerInParent="true"/>
+    </RelativeLayout>
+    <LinearLayout
+        android:orientation="vertical"
+        android:paddingLeft="25dp"
+        android:paddingTop="28dp"
+        android:paddingRight="25dp"
+        android:paddingBottom="28dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="512">
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="1. &apos;바로 구매하기&apos;로 변경 후, &apos;렌탈&apos;로 재변경은 불가합니다."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp"
+            android:text="2. &apos;렌탈&apos;에서 &apos;바로 구매하기&apos;로 변경 시 금액 계산은 다음 제품가격과 같습니다."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="- 1구 제품가격 : 57,000원"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="- 2구 제품가격 : 62,000원"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp"
+            android:text="3. 변경 시 이미 납부한 렌탈 비용의 환불은 어렵습니다. 다만, 아래 방식에 따라서 제품 가격을 할인 받을 수 있습니다."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="- 가. 렌탈 사용 중 한번도 교환을 받지 않은 경우"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text=" : 결제금액 = &apos;제품 가격&apos; - &apos;지금까지 결제한 렌탈 사용요금&apos;"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="- 나. 제품 하자가 아닌 고객 요청으로 교환을 받은 경우"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text=": 결제금액 = &apos;제품 가격&apos; - &apos;최근 교환일 이후 결제 된 렌탈 사용요금&apos;"/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text=": *금액 계산은 렌탈 사용 중 반납 시 환불금 계산방식과 동일함."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text=": *예시, 1구 제품을 2년플랜으로 결제한 고객이 1년(365일) 사용 후 교환을 했다면, 결제금액은 = ‘57,000’원 - ‘11,000’원으로 46,000원이 된다."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp"
+            android:text="4. &apos;렌탈&apos; 서비스는 구매가 아닌 대여방식으로 제품을 이용하는 방식입니다. 또한, 서비스에는 고객 요청이 있을 경우 1년 1회 무료 교환이 포함되어 있습니다."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="- 해당 서비스를 모두 이용(교환을 진행하였을 경우)했을 경우에는 렌탈 사용 금액이 환불 혹은 할인되지 않습니다."/>
+        <TextView
+            android:textSize="12sp"
+            android:textColor="@color/blue_grey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="- 다만, 고객 요청이 아닌 제품 하자로 교환을 했을 경우에는 위 경우에  해당되지 않습니다."/>
+    </LinearLayout>
+</LinearLayout>

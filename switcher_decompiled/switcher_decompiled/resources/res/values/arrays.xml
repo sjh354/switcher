@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="in_colors_dark">
+        <item>#4b00e5ff</item>
+        <item>#3300e5ff</item>
+        <item>#1900e5ff</item>
+    </array>
+    <array name="in_colors_light">
+        <item>#4b03a9f4</item>
+        <item>#3303a9f4</item>
+        <item>#1903a9f4</item>
+    </array>
+    <array name="progress_colors_dark">
+        <item>#ff00e5ff</item>
+        <item>#ffd81d5a</item>
+        <item>#fff27512</item>
+        <item>#ff63bc34</item>
+    </array>
+    <array name="progress_colors_light">
+        <item>#ff03a9f4</item>
+        <item>#ffd8433c</item>
+        <item>#fff2af3a</item>
+        <item>#ff279b5e</item>
+    </array>
+</resources>
