@@ -6,8 +6,10 @@
 
 | 경로 | 내용 |
 |---|---|
-| `switcher_core.py` | `IOSwitcher` — BLE 연결/재시도 + ON/OFF + 손가락 길이(stroke level) |
+| `switcher_protocol.py` | 순수 인코딩/파싱 (stroke·예약·시계·광고 패킷). **stdlib만 쓰므로 bleak 없이 import된다** |
+| `switcher_core.py` | `IOSwitcher` — BLE 연결/재시도 + 모든 읽기/쓰기 명령 |
 | `switcher_helper.py` | CLI. 스캔·이름/시리얼/MAC 매칭 후 명령 전송 |
+| `test_protocol.py` | 예약/시계/펌웨어/광고 패킷 인코딩 검증 (기기 없이 실행) |
 | `test_stroke.py` | stroke level 인코딩 검증 (기기 없이 실행) |
 | `Switcher/` | iOS(SwiftUI) 앱. ON/OFF만 구현 |
 | `switcher_decompiled/I_O_3.28.3_APKPure.apk` | 원본 APK |
@@ -50,11 +52,14 @@ switcher_decompiled/switcher_decompiled/sources/
 | 1구 ON/OFF | O | O |
 | 2구 ON/OFF | O (단 명령값 이슈, §3.1) | 부분 |
 | 손가락 길이 읽기/시험/저장 | O | **X — 미검증** |
-| 배터리 잔량 읽기 | X | - |
-| 펌웨어 버전 읽기 | X | - |
-| 예약(타이머) 읽기/추가/삭제 | X | - |
-| 기기 시계 설정 | X | - |
-| 광고 패킷 파싱(타입/시리얼 자동 판별) | X | - |
+| 배터리 잔량 읽기 | O | **X — 미검증** |
+| 펌웨어 버전 읽기 | O | **X — 미검증** |
+| 예약(타이머) 읽기/추가/삭제 | O | **X — 미검증** |
+| 기기 시계 읽기/설정 | O | **X — 미검증** |
+| 광고 패킷 파싱(타입/시리얼 자동 판별) | O | **X — 미검증** (오프셋 검증은 §2-1) |
+
+인코딩/파싱은 `test_protocol.py` + `test_stroke.py`로 기기 없이 검증돼 있다(§11).
+"실기기 검증 X"는 BLE 왕복과 기기의 실제 반응이 확인되지 않았다는 뜻이다.
 
 ---
 
@@ -177,26 +182,31 @@ asyncio.run(t("AA:BB:CC:DD:EE:FF", 0x02))   # 앱 기준 2구 ON
 
 ### 2-6. 배터리 / 펌웨어 버전 읽기
 
-```python
-import asyncio
-from bleak import BleakClient
-BAT = "000015aa-0000-1000-8000-00805f9b34fb"
-FW  = "000025ea-0000-1000-8000-00805f9b34fb"
-
-async def info(mac):
-    async with BleakClient(mac, timeout=30.0) as c:
-        print("battery raw:", (await c.read_gatt_char(BAT))[0], "%")
-        fw = await c.read_gatt_char(FW)
-        print("firmware:", f"{fw[0]}.{fw[1]}.{fw[2]}")
-asyncio.run(info("AA:BB:CC:DD:EE:FF"))
+```bash
+python switcher_helper.py --mac <MAC> --action battery
+python switcher_helper.py --mac <MAC> --action firmware
 ```
 
-기대: 배터리 0~100 (앱은 표시할 때 3을 뺀다, §5.2), 펌웨어 `0.x.y` (최신은 `0.8.8`).
+기대: 배터리 0~100 (앱은 표시할 때 3을 뺀다, §5.2 — 코드는 원시값을 그대로 보여준다),
+펌웨어 `0.x.y` (최신은 `0.8.8`). 길이 기능은 `0.6.x` 이상에서만 동작한다.
 
 ### 2-7. (선택) 예약/시계
 
-§6의 포맷대로 구현·검증. 예약을 쓰려면 기기 시계를 먼저 맞춰야 한다(§5.4). 슬롯이 10개뿐이고
-앱이 남긴 예약이 이미 들어있을 수 있으니, **먼저 `25ca`를 읽어 현재 상태를 백업**한 뒤 건드릴 것.
+구현은 끝났으니 검증만 남았다. 슬롯이 10개뿐이고 앱이 남긴 예약이 이미 들어있을 수 있으니,
+**먼저 읽어서 현재 상태를 백업**한 뒤 건드릴 것.
+
+```bash
+python switcher_helper.py --mac <MAC> --action timer-read          # 백업 먼저
+python switcher_helper.py --mac <MAC> --action clock-set           # 예약 전에 시계부터 (§3.4)
+python switcher_helper.py --mac <MAC> --action clock-read
+python switcher_helper.py --mac <MAC> --action timer-add --slot 0 --at 07:30 --days weekday
+python switcher_helper.py --mac <MAC> --action timer-read          # 들어갔는지 확인
+python switcher_helper.py --mac <MAC> --action timer-del --slot 0 --last
+```
+
+기대: `timer-read`가 방금 넣은 예약을 슬롯 0에서 돌려준다. 기기 시계가 안 맞으면 예약이
+엉뚱한 시각에 뜨므로 `clock-set`이 선행이다. 마지막 예약을 지울 때만 `--last`
+(그때만 timerVersion이 `FFFFFF`, §6.1).
 
 ---
 
@@ -210,9 +220,14 @@ asyncio.run(info("AA:BB:CC:DD:EE:FF"))
 |---|---|---|---|
 | ON/OFF 동작 | `000015ba` | 1B | `SwitcherBLEService.java:70` |
 | 손가락 길이 | `000015bb` | 1B | `SwitcherBLEService.java:74` |
-| 예약 추가 | `000015ca` | 9B | `SwitcherBLEService.java:78` |
-| 예약 삭제 | `000015ca` | 9B | `SwitcherBLEService.java:86` |
+| 예약 추가 | `000015ca` | 10B | `SwitcherBLEService.java:78` |
+| 예약 삭제 | `000015ca` | 10B | `SwitcherBLEService.java:86` |
 | 기기 시계 | `000045ea` | 3B | `SwitcherBLEService.java:95` |
+
+예약 패킷 크기를 이 문서가 한동안 9B로 잘못 적어뒀는데 **실제로는 10B**다.
+추가는 `"00"`(1B) + 예약데이터 12자(6B) + timerVersion 6자(3B) = 20 hex = 10B이고,
+삭제도 `"01"` + id 2자 + `"0000000000"`(5B) + timerVersion 6자 = 10B다. 즉 둘 다
+`[op 1B][예약레코드 6B][timerVersion 3B]` 한 틀이고, 삭제는 레코드의 뒤 5바이트를 0으로 민다.
 
 쓰기 방식은 두 종류다 (`SwitcherBLEService.java:32-44`):
 
@@ -296,7 +311,7 @@ public void writeStrokeLevel(int i, boolean z, ...) {
 | `stroke_level_short_situation` | **"작동할 때마다 본체가 떨어지거나 덜컹거려요."** → 짧은 길이로 |
 | `short_propose` / `long_propose` | "현재 최대로 짧은/긴 길이로 저장되어있습니다." |
 
-## 3.3 예약 추가/삭제 (`000015ca`, 9바이트)
+## 3.3 예약 추가/삭제 (`000015ca`, 10바이트)
 
 §6 참조.
 
@@ -306,6 +321,11 @@ public void writeStrokeLevel(int i, boolean z, ...) {
 1바이트 hex로. **요일은 월=0, 화=1, …, 일=6** (`kr/switcher/ioble/common/BLEUtil.java:19`
 `getDayOfWeekNumberForSwitcher()` — 자바 `Calendar.DAY_OF_WEEK`(일=1) 기준으로 `-2`,
 음수면 6). 예약 기능을 쓰려면 이걸 먼저 맞춰야 한다.
+
+이 요일 규약은 파이썬 `datetime.weekday()`와 정확히 같으므로 자바의 `-2` 보정을 옮길
+필요가 없다. 구현은 `switcher_protocol.clock_bytes()` / `parse_clock()`,
+`IOSwitcher.set_clock()` / `read_clock()`. 앱은 연결 직후 자동으로 시계를 써주는데
+(`SwitcherProcessor.java:71` `saveRealTime()`) 우리 쪽은 `clock-set`을 명시할 때만 쓴다.
 
 ---
 
@@ -397,9 +417,16 @@ gang   = full[14]        # 1 = 1구, 2 = 2구
 timerv = full[15:].hex()
 ```
 
-이게 실기기에서 맞는다면 `switcher_helper.py`의 퍼지 시리얼 매칭
-(`match_serial` / `_serial_variants` / `_match_device` / `_collect_tokens`, score 100/50/25)
-약 60줄과 `--type` 수동 지정이 전부 정확한 파싱으로 대체된다. §2-1에서 확인할 항목.
+구현: `switcher_protocol.parse_adv()` → `Adv(mac, serial, gang, timer_version)`,
+`switcher_helper.adv_info()`가 `manufacturer_data`를 훑어 첫 파싱 성공분을 쓴다.
+이걸 넣으면서 기존 퍼지 시리얼 매칭(`match_serial` / `_serial_variants` /
+`_match_device` / `_collect_tokens`, score 100/50/25) 약 60줄을 지웠고, `--serial`은
+파싱된 시리얼과 정확 비교, `--type`은 광고의 `gang`으로 자동 판별한다.
+
+**단 이 오프셋은 여전히 실기기 미검증이다(§2-1).** 어긋나면 `--type 1|2`를 수동으로
+지정해 우회할 수 있게 남겨뒀고(명시하면 자동 판별을 이긴다), 되돌려야 하면 지운
+60줄은 git 이력에 있다. `--mac`으로 스캔을 건너뛸 때는 광고를 못 보므로 `--type`
+미지정 시 1구로 간주한다.
 
 ## 4.5 연결 시퀀스와 타임아웃
 
@@ -577,9 +604,19 @@ OAuth 토큰이 필요하고 서비스가 종료됐다. 원격 제어는 별도 
 
 ---
 
-# 6. 예약(타이머) 프로토콜 — 미구현, 명세는 완비
+# 6. 예약(타이머) 프로토콜
 
-## 6.1 추가 (`000015ca`에 9바이트)
+구현: `switcher_protocol.py`의 `Reservation` / `reservation_record()` /
+`timer_version()` / `add_timer_packet()` / `remove_timer_packet()` /
+`parse_reservations()`, `switcher_core.py`의 `IOSwitcher.read_reservations()` /
+`add_reservation()` / `remove_reservation()`. 인코딩은 `test_protocol.py`로 검증됨,
+실기기 왕복은 미검증(§2-7).
+
+`Reservation`은 앱의 am/pm 필드를 버리고 24시간제만 쓴다 (am/pm은 앱 12시간제 UI 때문에
+있던 것이고, 기기에 나가는 바이트는 어차피 24시간제다). 요일은 `0=월 … 6=일` 집합으로
+받는다 — 기기 요일 규약과 같다(§3.4).
+
+## 6.1 추가 (`000015ca`에 10바이트)
 
 `kr/switcher/ioble/protocol/SwitcherBLEService.java:78-84` — 쓰는 hex는
 `"00"` + 예약데이터(12자) + timerVersion(6자).
@@ -609,7 +646,7 @@ OAuth 토큰이 필요하고 서비스가 종료됐다. 원격 제어는 별도 
 추가/수정 진입점: `kr/switcher/device/switcher/ble/SwitcherBLE.java:194-217`
 (`addReservation` → 10개 초과면 에러코드 106, `updateReservation` → 중복이면 112).
 
-## 6.2 삭제 (`000015ca`에 9바이트)
+## 6.2 삭제 (`000015ca`에 10바이트)
 
 `SwitcherBLEService.java:86-93` — `"01"` + id(2자) + `"0000000000"` + timerVersion(6자).
 
@@ -617,6 +654,12 @@ id 변환에 `BLEUtil.hexToHexString()`(`kr/switcher/ioble/common/BLEUtil.java:3
 이 함수는 문자열의 각 문자를 십진수로 읽어 `%02x`로 이어붙이는 괴상한 변환이다.
 `"3"` → `"03"`은 맞지만 `"10"` → `"0100"`(4자)이 되어 길이 검사(`!= 2`)에 걸려
 **슬롯 id 10 삭제가 조용히 실패하는 앱 버그**가 있다. 슬롯은 0~9만 쓰면 안전하다.
+`remove_timer_packet()`은 0~9를 벗어난 슬롯을 `ValueError`로 거부한다 — 조용히 실패하는
+대신 터지게 해둔 것.
+
+`timerVersion`은 `SwitcherBLE.java:227`이 `makeTimerVersion(sResrvs.size() > 1)`을 쓴다.
+즉 **지우고 나면 남는 예약이 없을 때만** `FFFFFF`다 → `remove_reservation(slot, last=True)`
+/ CLI `--last`.
 
 ## 6.3 읽기 (`000025ca`, 50바이트)
 
@@ -699,10 +742,28 @@ python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action stroke-set --level 2
 
 # ON/OFF (2구는 --type 2 → 현재 ON에 0x05를 쓴다. §2-5 확인 필요)
 python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action on --type 2
+
+# 배터리 / 펌웨어 / 기기 시계
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action battery
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action firmware
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action clock-read
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action clock-set    # 지금 시각으로
+
+# 예약 — 읽기 → 추가 → 삭제
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action timer-read
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action timer-add \
+    --slot 0 --at 07:30 --days weekday               # 평일 7시30분 켜기
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action timer-add \
+    --slot 1 --at 23:00 --days mon,wed,fri --off --target 1   # 2구 두번째 발 끄기
+python switcher_helper.py --mac D4:AD:8B:C9:60:7C --action timer-del --slot 0
 ```
 
 `--mac` 대신 `--name SWITCHER_M` 또는 `--serial 9EF02EE6`으로도 찾을 수 있고, 후보가 여러 개면
-`--index N`으로 고른다.
+`--index N`으로 고른다. `--days`는 `mon,tue,...` 나열 또는 `all` / `weekday` / `weekend`.
+`--slot`은 0~9(기기 슬롯이 10개), 같은 슬롯에 쓰면 덮어쓴다. 마지막 예약을 지울 때만
+`--action timer-del --slot N --last`.
+
+`--type`은 생략하면 광고 패킷에서 1구/2구를 자동 판별한다(§4.4, 미검증이므로 어긋나면 수동 지정).
 
 파이썬에서 직접:
 
@@ -717,9 +778,26 @@ asyncio.run(sw.set_stroke_level(2))                   # 저장
 asyncio.run(sw.turn_on())
 ```
 
-구현 위치: `switcher_core.py`의 `stroke_byte()`(인코딩), `IOSwitcher.read_stroke_level()`,
-`IOSwitcher.set_stroke_level()`. `_sendcommand()`에 `char_uuid` 인자가 있어 같은
-연결/재시도 로직을 다른 characteristic에도 재사용한다.
+```python
+from datetime import datetime
+from switcher_core import IOSwitcher
+from switcher_protocol import Reservation
+
+sw = IOSwitcher("D4:AD:8B:C9:60:7C", type=2)
+print(asyncio.run(sw.read_battery()))                 # 0~100 (원시값)
+print(asyncio.run(sw.read_firmware()))                # "0.8.8"
+print(asyncio.run(sw.read_clock()))                   # (요일 0=월, 시, 분)
+asyncio.run(sw.set_clock())                           # 지금 시각으로 (예약 전에 선행)
+print(asyncio.run(sw.read_reservations()))            # [Reservation, ...]
+asyncio.run(sw.add_reservation(
+    Reservation(slot=0, hour=7, minute=30, days={0, 1, 2, 3, 4})))
+asyncio.run(sw.remove_reservation(0, last=True))      # 마지막 예약일 때만 last=True
+```
+
+구현 위치: 인코딩/파싱은 전부 `switcher_protocol.py`(bleak 비의존)에 있고
+`switcher_core.py`가 re-export하므로 `switcher_core.stroke_byte()`처럼 써도 된다.
+BLE 왕복은 `IOSwitcher._sendcommand()`(쓰기)와 `_read()`(읽기) 둘뿐이고, 양쪽 다
+`char_uuid` 인자로 같은 연결/재시도 로직을 모든 characteristic에 재사용한다.
 
 ## 알려진 코드 주의사항
 
@@ -741,13 +819,25 @@ asyncio.run(sw.turn_on())
 # 11. 테스트
 
 ```bash
+python test_protocol.py
+# OK: 예약 10B 추가/삭제, 50B 읽기 왕복, 시계 요일, 펌웨어, 광고 패킷
+
 python test_stroke.py
 # OK: 0x00/0x01, 0x10/0x11, 0x20/0x21
 ```
 
-기기 없이 도는 인코딩 검증. 앱 원본식 `Integer.parseInt(str(level) + flag, 16)`을 파이썬에서
-다시 계산해 `stroke_byte()` 결과와 대조하고, 기기 등록 기본값 `0x10`과 잘못된 레벨(3) 거부를
-확인한다. BLE 왕복은 검증 대상이 아니다 — 실기기 검증은 §2 체크리스트로.
+둘 다 기기 없이 도는 인코딩/파싱 검증이고, 앱 원본식을 파이썬에서 다시 계산해 대조하는
+방식이다. `test_protocol.py`는 `switcher_protocol.py`만 import하므로 **bleak 없이도
+돌아간다**; `test_stroke.py`는 `switcher_core`를 거치므로 bleak이 필요하다.
+
+- `test_stroke.py` — 앱 원본식 `Integer.parseInt(str(level) + flag, 16)` 대조, 기기 등록
+  기본값 `0x10`, 잘못된 레벨(3) 거부
+- `test_protocol.py` — 예약 레코드 6B를 앱 `getResrvDataForBLE()`의 문자열 연산까지 그대로
+  재현해 대조, 추가/삭제 패킷이 10B인지, 50B 읽기 왕복, 빈 슬롯(`FFFFFFFFFF`) 건너뛰기,
+  시가 24 이상이면 파싱 중단, 슬롯 10 거부, `timerVersion` FFFFFF/시각, 요일 7개를 자바
+  `Calendar.DAY_OF_WEEK - 2` 공식과 대조, 펌웨어 문자열, 광고 패킷의 하위 니블 시리얼
+
+BLE 왕복은 어느 쪽도 검증하지 않는다 — 실기기 검증은 §2 체크리스트로.
 
 ---
 
@@ -755,11 +845,15 @@ python test_stroke.py
 
 우선순위 순.
 
+기능 구현은 §1 표의 항목이 전부 끝났다. **남은 건 실기기 검증뿐이고, 그게 지금 유일한 병목이다.**
+
 1. **§2 체크리스트 수행** — 특히 2-3/2-4(길이 실동작)와 2-5(2구 `0x02` vs `0x05`).
    결과를 이 README에 반영할 것.
-2. **광고 패킷 파서 도입** (§4.4) — `--type` 자동 판별 + 시리얼 정확 매칭. `switcher_helper.py`의
-   퍼지 매칭 60여 줄이 사라진다. 코드가 가장 많이 줄어드는 항목.
-3. **배터리 / 펌웨어 버전 읽기 추가** — 각각 한 줄짜리 read. `-3` 보정은 하지 말고 원시값을
-   보여주는 편이 낫다(§5.2).
-4. **예약(타이머) 구현** (§6) — 읽기부터. 쓰기 전에 기기 시계 설정(§3.4)이 선행되어야 하고,
+2. **§2-1로 광고 패킷 오프셋 확인** — `--type` 자동 판별과 `--serial` 정확 매칭이 여기에
+   전부 걸려 있다. 어긋나면 §4.4를 고치고 `parse_adv()`의 오프셋을 맞출 것.
+3. **§2-7로 예약/시계 검증** — 기기 시계(`clock-set`) → 예약 추가 → `timer-read`로 왕복 확인.
    기존 예약을 먼저 백업할 것.
+4. 검증이 끝나면 그때 결정할 것들:
+   - `ON_KEY2`를 `0x05` → `0x02`로 고칠지 (§2-5 결과에 따라)
+   - `_find_characteristic_uuid()` 자동 선택을 `000015ba` 고정으로 바꿀지 (§10 주의사항)
+   - iOS 앱(`Switcher/`)에 길이/예약을 옮길지 — 지금은 ON/OFF만 있다

@@ -1,11 +1,18 @@
-import sys
-import time
 import binascii
 import logging
-from typing import Any
+from datetime import datetime
 from bleak.backends.device import BLEDevice
 import asyncio
 from bleak import BleakScanner, BleakClient
+
+from switcher_protocol import (
+    Reservation,
+    STROKE_LONG, STROKE_MEDIUM, STROKE_NAMES, STROKE_SHORT,
+    UUID_BATTERY, UUID_CLOCK, UUID_FIRMWARE, UUID_OPERATION,
+    UUID_STROKE, UUID_SWITCH_SERVICE, UUID_TIMER_DATA, UUID_TIMER_OP,
+    add_timer_packet, clock_bytes, parse_clock, parse_firmware,
+    parse_reservations, remove_timer_packet, stroke_byte,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,25 +21,14 @@ DEFAULT_RETRY_TIMEOUT = 2.0
 DEFAULT_SCAN_TIMEOUT = 15.0
 DEFAULT_CONNECT_TIMEOUT = 30.0
 
-SERVICE_UUID = "0000150b-0000-1000-8000-00805f9b34fb"
+SERVICE_UUID = UUID_SWITCH_SERVICE
 # 손가락 길이(stroke level) 전용 characteristic. 동작(15ba)과 같은 서비스 안에 따로 있다.
-STROKE_CHAR_UUID = "000015bb-0000-1000-8000-00805f9b34fb"
-STROKE_SHORT, STROKE_MEDIUM, STROKE_LONG = 0, 1, 2
-STROKE_NAMES = {0: "짧게", 1: "중간(공장 기본)", 2: "길게"}
+STROKE_CHAR_UUID = UUID_STROKE
 ON_KEY1 = binascii.a2b_hex("00")
 OFF_KEY1 = binascii.a2b_hex("01")
 ON_KEY2 = binascii.a2b_hex("05")
 OFF_KEY2 = binascii.a2b_hex("03")
 
-
-def stroke_byte(level: int, test: bool = False) -> bytes:
-    """앱 SwitcherBLEService.writeStrokeLevel()과 동일한 1바이트 인코딩.
-
-    상위 니블 = 길이 레벨(0/1/2), 하위 니블 = 1이면 저장 없이 그 길이로 1회 동작만.
-    """
-    if level not in STROKE_NAMES:
-        raise ValueError(f"level은 0/1/2 (받은 값: {level})")
-    return bytes([(level << 4) | (1 if test else 0)])
 
 class IOSwitcher:
     def __init__(self, mac, device: BLEDevice = None, name: str = None,
@@ -119,18 +115,51 @@ class IOSwitcher:
 
     async def read_stroke_level(self) -> int:
         """현재 저장된 손가락 길이(0=짧게, 1=중간, 2=길게)."""
-        try:
-            await self._connect()
-            raw = await self._client.read_gatt_char(STROKE_CHAR_UUID)
-            _LOGGER.info(f"stroke level = {raw[0]} ({STROKE_NAMES.get(raw[0], '?')})")
-            return raw[0]
-        finally:
-            await self._disconnect()
+        raw = await self._read(STROKE_CHAR_UUID)
+        _LOGGER.info(f"stroke level = {raw[0]} ({STROKE_NAMES.get(raw[0], '?')})")
+        return raw[0]
 
     async def set_stroke_level(self, level: int, test: bool = False) -> bool:
         """손가락 길이 저장. test=True면 저장하지 않고 그 길이로 한 번 동작만 해본다."""
         return await self._sendcommand(stroke_byte(level, test), self._retry_count,
                                        STROKE_CHAR_UUID)
+
+    async def read_battery(self) -> int:
+        """배터리 잔량 퍼센트. 앱은 표시할 때 3을 빼지만(§5.2) 여기선 원시값 그대로."""
+        return (await self._read(UUID_BATTERY))[0]
+
+    async def read_firmware(self) -> str:
+        """펌웨어 버전 "x.y.z". 손가락 길이는 0.6.x 이상에서만 동작한다."""
+        return parse_firmware(await self._read(UUID_FIRMWARE))
+
+    async def read_clock(self) -> tuple[int, int, int]:
+        """기기 시계 (요일 0=월, 시 24h, 분)."""
+        return parse_clock(await self._read(UUID_CLOCK))
+
+    async def set_clock(self, now: datetime | None = None) -> bool:
+        """기기 시계를 맞춘다. 예약을 쓰려면 이게 선행되어야 한다 (§3.4)."""
+        return await self._sendcommand(clock_bytes(now), self._retry_count, UUID_CLOCK)
+
+    async def read_reservations(self) -> list[Reservation]:
+        """등록된 예약 목록 (빈 슬롯 제외)."""
+        return parse_reservations(await self._read(UUID_TIMER_DATA))
+
+    async def add_reservation(self, r: Reservation) -> bool:
+        """예약을 slot 위치에 쓴다. 같은 슬롯에 있던 예약은 덮어쓴다."""
+        return await self._sendcommand(add_timer_packet(r), self._retry_count,
+                                       UUID_TIMER_OP)
+
+    async def remove_reservation(self, slot: int, last: bool = False) -> bool:
+        """예약 삭제. 지우고 나면 남는 예약이 없을 때만 last=True (§6.1 timerVersion)."""
+        packet = remove_timer_packet(slot, None if last else datetime.now())
+        return await self._sendcommand(packet, self._retry_count, UUID_TIMER_OP)
+
+    async def _read(self, char_uuid: str) -> bytes:
+        try:
+            await self._connect()
+            return await self._client.read_gatt_char(char_uuid)
+        finally:
+            await self._disconnect()
 
     async def _sendcommand(self, key, retry, char_uuid=None) -> bool:
         try:
