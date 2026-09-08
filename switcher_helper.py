@@ -11,7 +11,7 @@ from typing import Any
 from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 
-from switcher_core import IOSwitcher
+from switcher_core import IOSwitcher, STROKE_NAMES
 
 
 @dataclass
@@ -69,13 +69,21 @@ class SwitcherHelper:
     @staticmethod
     async def control(
         device: BLEDevice | None, mac: str, switch_type: int, action: str,
-        name: str = None,
+        name: str = None, level: int = None,
     ) -> bool:
         sw = IOSwitcher(mac=mac, device=device, name=name, type=switch_type)
         if action == "on":
             return await sw.turn_on()
         if action == "off":
             return await sw.turn_off()
+        if action == "stroke-read":
+            value = await sw.read_stroke_level()
+            print(f"stroke level = {value} ({STROKE_NAMES.get(value, '?')})")
+            return True
+        if action in ("stroke-set", "stroke-test"):
+            if level is None:
+                raise ValueError(f"{action}에는 --level 0|1|2 이 필요합니다")
+            return await sw.set_stroke_level(level, test=(action == "stroke-test"))
         raise ValueError(f"Unknown action: {action}")
 
     def _match_device(self, variants: set[str], device: BLEDevice, adv: Any) -> MatchResult:
@@ -153,9 +161,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--type", type=int, choices=[1, 2], default=1, help="Switcher gang type")
     parser.add_argument(
         "--action",
-        choices=["none", "on", "off"], # toggle 삭제
+        choices=["none", "on", "off", "stroke-read", "stroke-set", "stroke-test"], # toggle 삭제
         default="none",
         help="Run a control command after selecting a candidate",
+    )
+    parser.add_argument(
+        "--level",
+        type=int,
+        choices=[0, 1, 2],
+        help="손가락 길이 (0=짧게, 1=중간, 2=길게). stroke-set/stroke-test 에 사용",
     )
     parser.add_argument(
         "--index",
@@ -195,7 +209,7 @@ async def _main() -> int:
     if args.mac and args.action != "none":
         try:
             ok = await helper.control(None, args.mac, args.type, args.action,
-                                      name=args.name)
+                                      name=args.name, level=args.level)
             return 0 if ok else 1
         except Exception as exc:
             print(f"Control failed: {exc}")
@@ -232,7 +246,8 @@ async def _main() -> int:
     print(f"Using {chosen.device.name} ({chosen.device.address})")
 
     try:
-        ok = await helper.control(chosen.device, chosen.device.address, args.type, args.action)
+        ok = await helper.control(chosen.device, chosen.device.address, args.type,
+                                  args.action, level=args.level)
         return 0 if ok else 1
     except Exception as exc:
         print(f"Control failed: {exc}")

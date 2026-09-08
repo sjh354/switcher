@@ -15,10 +15,24 @@ DEFAULT_SCAN_TIMEOUT = 15.0
 DEFAULT_CONNECT_TIMEOUT = 30.0
 
 SERVICE_UUID = "0000150b-0000-1000-8000-00805f9b34fb"
+# 손가락 길이(stroke level) 전용 characteristic. 동작(15ba)과 같은 서비스 안에 따로 있다.
+STROKE_CHAR_UUID = "000015bb-0000-1000-8000-00805f9b34fb"
+STROKE_SHORT, STROKE_MEDIUM, STROKE_LONG = 0, 1, 2
+STROKE_NAMES = {0: "짧게", 1: "중간(공장 기본)", 2: "길게"}
 ON_KEY1 = binascii.a2b_hex("00")
 OFF_KEY1 = binascii.a2b_hex("01")
 ON_KEY2 = binascii.a2b_hex("05")
 OFF_KEY2 = binascii.a2b_hex("03")
+
+
+def stroke_byte(level: int, test: bool = False) -> bytes:
+    """앱 SwitcherBLEService.writeStrokeLevel()과 동일한 1바이트 인코딩.
+
+    상위 니블 = 길이 레벨(0/1/2), 하위 니블 = 1이면 저장 없이 그 길이로 1회 동작만.
+    """
+    if level not in STROKE_NAMES:
+        raise ValueError(f"level은 0/1/2 (받은 값: {level})")
+    return bytes([(level << 4) | (1 if test else 0)])
 
 class IOSwitcher:
     def __init__(self, mac, device: BLEDevice = None, name: str = None,
@@ -61,12 +75,19 @@ class IOSwitcher:
                         _LOGGER.info(f"이름으로 발견: {d.address}")
                         break
 
-        if not self._device:
+        if not self._device and not self._mac:
             raise Exception(f"장치를 찾을 수 없습니다. (mac={self._mac}, name={self._name})")
 
         await asyncio.sleep(0.3)
 
-        self._client = BleakClient(self._device, timeout=DEFAULT_CONNECT_TIMEOUT)
+        # 3순위: 스캔에 안 잡혀도 MAC이 있으면 직접 연결한다. 기기가 이미 다른 쪽에
+        # 연결돼 있어 광고를 멈춘 상태거나 이름이 안 실려 오는 경우에도, BlueZ가 들고
+        # 있는 캐시로 붙는다. 앱도 스캔보다 시스템 연결 목록을 먼저 본다 (README §4.6).
+        if not self._device:
+            _LOGGER.info(f"스캔 실패, MAC({self._mac})으로 직접 연결 시도...")
+
+        self._client = BleakClient(self._device or self._mac,
+                                   timeout=DEFAULT_CONNECT_TIMEOUT)
         await self._client.connect()
         
         if not self._char_uuid:
@@ -96,10 +117,25 @@ class IOSwitcher:
     async def turn_off(self) -> bool:
         return await self._sendcommand(self._off_key, self._retry_count)
 
-    async def _sendcommand(self, key, retry) -> bool:
+    async def read_stroke_level(self) -> int:
+        """현재 저장된 손가락 길이(0=짧게, 1=중간, 2=길게)."""
         try:
             await self._connect()
-            await self._client.write_gatt_char(self._char_uuid, key)
+            raw = await self._client.read_gatt_char(STROKE_CHAR_UUID)
+            _LOGGER.info(f"stroke level = {raw[0]} ({STROKE_NAMES.get(raw[0], '?')})")
+            return raw[0]
+        finally:
+            await self._disconnect()
+
+    async def set_stroke_level(self, level: int, test: bool = False) -> bool:
+        """손가락 길이 저장. test=True면 저장하지 않고 그 길이로 한 번 동작만 해본다."""
+        return await self._sendcommand(stroke_byte(level, test), self._retry_count,
+                                       STROKE_CHAR_UUID)
+
+    async def _sendcommand(self, key, retry, char_uuid=None) -> bool:
+        try:
+            await self._connect()
+            await self._client.write_gatt_char(char_uuid or self._char_uuid, key)
             _LOGGER.info("명령 전송 성공")
             return True
         except Exception as e:
@@ -107,7 +143,7 @@ class IOSwitcher:
             if retry > 0:
                 await self._disconnect()
                 await asyncio.sleep(DEFAULT_RETRY_TIMEOUT)
-                return await self._sendcommand(key, retry - 1)
+                return await self._sendcommand(key, retry - 1, char_uuid)
             return False
         finally:
             await self._disconnect()
