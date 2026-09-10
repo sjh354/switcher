@@ -26,7 +26,8 @@ SERVICE_UUID = UUID_SWITCH_SERVICE
 STROKE_CHAR_UUID = UUID_STROKE
 ON_KEY1 = binascii.a2b_hex("00")
 OFF_KEY1 = binascii.a2b_hex("01")
-ON_KEY2 = binascii.a2b_hex("05")
+# 2구 두번째 ON. 앱 정식값은 0x02이고 0x05도 실기기에서 동작하지만 앱 소스에 없다 (§2-5).
+ON_KEY2 = binascii.a2b_hex("02")
 OFF_KEY2 = binascii.a2b_hex("03")
 
 
